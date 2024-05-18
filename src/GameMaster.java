@@ -12,6 +12,7 @@ public class GameMaster extends Agent {
     private int stepInRound = 0;
     private boolean initGameOver = false;
     private boolean gameOver = false;
+    private String gameOverDescription = "";
 
     public static final int WAIT_CHOOSE_ACTION_STEP = 0;
     public static final int SYNCHRONIZE_CHOOSE_ACTION_STEP = 1;
@@ -42,13 +43,22 @@ public class GameMaster extends Agent {
                             // If one of the message is a game over message, we stop the game in the next step
                             if(msg.getOntology() == Player.SYNCHRONIZE_GAME_OVER_ONTOLOGY)
                             {
+                                // Get how the game ended
+                                String description = msg.getContent();
+                                if(!description.isEmpty())
+                                    gameOverDescription += description + "\n";
+
                                 initGameOver = true;
                             }
                             else
                             {
                                 try {
-                                    int nbOffersSent = (int) msg.getContentObject();
-                                    gameNbOffers += nbOffersSent;
+                                    PlayerOffer offer = (PlayerOffer) msg.getContentObject();
+                                    if(offer != null)
+                                    {
+                                        System.out.println("- Player" + (offer.getProposerId()+1) + " offers " + offer.getPinOffered() + " in exchange of " + offer.getPinRequested() + ". Trials: " + offer.getNbRoundsBlocked());
+                                        gameNbOffers ++;
+                                    }
                                 } catch (Exception e) {
                                     e.printStackTrace();
                                 }
@@ -89,7 +99,7 @@ public class GameMaster extends Agent {
                                 e.printStackTrace();
                             }
                         }
-                        
+
                         // Send the message to all players
                         send(msg);
                         // Update the gui
@@ -100,7 +110,6 @@ public class GameMaster extends Agent {
                         // Check if the game is over
                         if(initGameOver)
                         {
-                            gameOver = true;
                             stepInRound = SYNCHRONIZE_GAME_OVER_STEP;
                         }
                         else
@@ -115,6 +124,17 @@ public class GameMaster extends Agent {
                         ACLMessage msg = receive(mt);
                         if(msg != null)
                         {
+                            try {
+                                PlayerOffer offer = (PlayerOffer) msg.getContentObject();
+                                if(offer != null)
+                                {
+                                    System.out.println("- Player" + (offer.getProposerId()+1) + " offers " + offer.getPinOffered() + " in exchange of " + offer.getPinRequested() + " to Player" + (offer.getResponderId()+1));
+                                    System.out.println("\tPlayer" + (offer.getProposerId()+1) + " has " + (offer.hasProposerDeceived() ? "deceived" : "not deceived") + " and Player" + (offer.getResponderId()+1) + " has " + (offer.hasResponderDeceived() ? "deceived" : "not deceived"));
+                                }
+                            } catch (Exception e) {
+                                e.printStackTrace();
+                            }
+
                             nbPlayersFinishedStep++;
                             if(nbPlayersFinishedStep == gui.getGame().getNbPlayers())
                             {
@@ -176,6 +196,29 @@ public class GameMaster extends Agent {
                     }
                     case SYNCHRONIZE_GAME_OVER_STEP:
                     {
+                        MessageTemplate mt = MessageTemplate.MatchOntology(Player.SYNCHRONIZE_REWARD_ONTOLOGY);
+                        ACLMessage msg = receive(mt);
+                        if(msg != null)
+                        {
+                            try {
+                                int reward = (int) msg.getContentObject();
+                                System.out.println(msg.getSender().getLocalName() + " has " + reward + " points");
+                            } catch (Exception e) {
+                                e.printStackTrace();
+                            }
+
+                            nbPlayersFinishedStep++;
+                            if(nbPlayersFinishedStep == gui.getGame().getNbPlayers())
+                            {
+                                nbPlayersFinishedStep = 0;
+                                gameOver = true;
+                                stepInRound = SYNCHRONIZE_GAME_OVER_STEP;
+                            }
+                        }
+                        else
+                        {
+                            block();
+                        }
                         break;
                     }
                 }
@@ -187,6 +230,8 @@ public class GameMaster extends Agent {
                 {
                     gui.getGame().setOver();
                     System.out.println("Game ended in " + round + " rounds");
+                    if(!gameOverDescription.isEmpty())
+                        System.out.println(gameOverDescription.trim());
                 }
                 return gameOver;
             }

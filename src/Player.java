@@ -23,6 +23,7 @@ public class Player extends Agent {
     private int gameNbOffers = 0;
     private int nbRespondersRepliesReceived = 0;
     private boolean gameOver = false;
+    private String gameOverDescription = null;
 
     public static final int MAX_ROUNDS_BLOCKED = 3;
 
@@ -38,6 +39,7 @@ public class Player extends Agent {
     public static final String SYNCHRONIZE_RECEIVE_OFFERS_ONTOLOGY = "Synchronize Receive Offers";
     public static final String SYNCHRONIZE_OFFERS_REPLY_ONTOLOGY = "Synchronize Offers Reply";
     public static final String SYNCHRONIZE_GAME_OVER_ONTOLOGY = "Synchronize Game Over";
+    public static final String SYNCHRONIZE_REWARD_ONTOLOGY = "Synchronize Reward";
 
     public static final String OFFER_PROPOSAL_ONTOLOGY = "Offer Proposal";
     public static final String RESPONDER_OFFER_REPLY_ONTOLOGY = "Responder Offer Reply";
@@ -75,11 +77,12 @@ public class Player extends Agent {
                         {
                             // The player reached the goal
                             reachedGoal = true;
-                            System.out.println("Player" + (id+1) + " reached the goal!");
+                            gameOverDescription = "Player" + (id+1) + " reached the goal!";
                             // Send a message to the game message to inform it that the game is over
                             ACLMessage msgGM = new ACLMessage(ACLMessage.INFORM);
                             msgGM.addReceiver(new AID("GameMaster", AID.ISLOCALNAME));
                             msgGM.setOntology(SYNCHRONIZE_GAME_OVER_ONTOLOGY);
+                            msgGM.setContent(gameOverDescription);
                             send(msgGM);
 
                             step = SYNCHRONIZE_CHOOSE_ACTION_STEP;
@@ -150,6 +153,8 @@ public class Player extends Agent {
                             }
                         }
 
+                        // Move the player or generate an offer
+                        PlayerOffer offer = null;
                         if(minIndex != -1)
                         {
                             if(minIndex == 0)
@@ -208,9 +213,8 @@ public class Player extends Agent {
                                 }
                             }
                             
-                            System.out.println("Player" + (id+1) + " Offering pin " + pinOffered + " for pin " + pinRequested + " for " + nbRoundsBlocked + " rounds");
                             try {
-                                PlayerOffer offer = new PlayerOffer(id, pinOffered, pinRequested, nbRoundsBlocked);
+                                offer = new PlayerOffer(id, pinOffered, pinRequested, nbRoundsBlocked);
                                 offer.setProposerDeceived(maxNbPins == 0);
                                 msg.setContentObject(offer);
                                 msg.setOntology(OFFER_PROPOSAL_ONTOLOGY);
@@ -225,11 +229,12 @@ public class Player extends Agent {
                         if(nbRoundsBlocked == MAX_ROUNDS_BLOCKED)
                         {
                             // The player is blocked
-                            System.out.println("Player" + (id+1) + " is blocked!");
+                            gameOverDescription = "Player" + (id+1) + " is blocked!";
                             // Send a message to the game message to inform it that the game is over
                             ACLMessage msgGM = new ACLMessage(ACLMessage.INFORM);
                             msgGM.addReceiver(new AID("GameMaster", AID.ISLOCALNAME));
                             msgGM.setOntology(SYNCHRONIZE_GAME_OVER_ONTOLOGY);
+                            msgGM.setContent(gameOverDescription);
                             send(msgGM);
 
                             step = SYNCHRONIZE_CHOOSE_ACTION_STEP;
@@ -243,7 +248,8 @@ public class Player extends Agent {
                         msgGM.addReceiver(new AID("GameMaster", AID.ISLOCALNAME));
                         msgGM.setOntology(SYNCHRONIZE_CHOOSE_ACTION_ONTOLOGY);
                         try {
-                            msgGM.setContentObject(nbOffersSent);
+                            if(offer != null)
+                                msgGM.setContentObject(offer);
                         } catch (Exception e) {
                             e.printStackTrace();
                         }
@@ -263,7 +269,6 @@ public class Player extends Agent {
                             // The GameMaster informs players that the game is over
                             if(msg.getOntology() == SYNCHRONIZE_GAME_OVER_ONTOLOGY)
                             {
-                                gameOver = true;
                                 step = SYNCHRONIZE_GAME_OVER_STEP;
                             }
                             else // Otherwise continue playing
@@ -304,7 +309,6 @@ public class Player extends Agent {
                         ACLMessage msg = receive(mt);
                         if(msg != null)
                         {
-                            System.out.println("Player" + (id+1) + " received an offer");
                             try {
                                 PlayerOffer offer = (PlayerOffer) msg.getContentObject();
                                 offers.add(offer);
@@ -400,11 +404,11 @@ public class Player extends Agent {
                                 if(minOfferIndex != -1)
                                 {
                                     ACLMessage reply = new ACLMessage(ACLMessage.ACCEPT_PROPOSAL);
-                                    reply.addReceiver(new AID("Player" + (offers.get(minOfferIndex).getPlayerId() + 1), AID.ISLOCALNAME));
+                                    reply.addReceiver(new AID("Player" + (offers.get(minOfferIndex).getProposerId() + 1), AID.ISLOCALNAME));
                                     try {
                                         // Send reply
                                         offers.get(minOfferIndex).setResponderDeceived(!minOfferhasRequestedPin);
-                                        System.out.println("Player" + (id+1) + " accepted an offer from Player" + (offers.get(minOfferIndex).getPlayerId()+1) + " for pin " + offers.get(minOfferIndex).getPinOffered() + " in exchange of pin " + offers.get(minOfferIndex).getPinRequested() + " for " + offers.get(minOfferIndex).getNbRoundsBlocked() + " rounds" + " and its proposer " + (offers.get(minOfferIndex).hasProposerDeceived() ? "DECEIVED" : "NOT DECEIVED") + " and its responder " + (offers.get(minOfferIndex).hasResponderDeceived() ? "DECEIVED" : "NOT DECEIVED"));
+                                        offers.get(minOfferIndex).setResponderId(id);
                                         reply.setOntology(RESPONDER_OFFER_REPLY_ONTOLOGY);
                                         reply.setContentObject(offers.get(minOfferIndex));
                                         send(reply);
@@ -425,7 +429,7 @@ public class Player extends Agent {
                                     for(int i = 0; i<offers.size(); i++)
                                     {
                                         if(i != minOfferIndex)
-                                            refuseReply.addReceiver(new AID("Player" + (offers.get(i).getPlayerId() + 1), AID.ISLOCALNAME));
+                                            refuseReply.addReceiver(new AID("Player" + (offers.get(i).getProposerId() + 1), AID.ISLOCALNAME));
                                     }
                                     refuseReply.setOntology(RESPONDER_OFFER_REPLY_ONTOLOGY);
                                     send(refuseReply);
@@ -435,6 +439,12 @@ public class Player extends Agent {
                                 ACLMessage msgGM = new ACLMessage(ACLMessage.INFORM);
                                 msgGM.addReceiver(new AID("GameMaster", AID.ISLOCALNAME));
                                 msgGM.setOntology(SYNCHRONIZE_RECEIVE_OFFERS_ONTOLOGY);
+                                try {
+                                    if(minOfferIndex != -1)
+                                        msgGM.setContentObject(offers.get(minOfferIndex));
+                                } catch (Exception e) {
+                                    e.printStackTrace();
+                                }
                                 send(msgGM);
                                 // Reset received offers state
                                 offers.clear();
@@ -487,7 +497,6 @@ public class Player extends Agent {
                         ACLMessage msg = receive(mt);
                         if(msg != null)
                         {
-                            System.out.println("=>\tPlayer" + (id+1) + " received a reply from " + msg.getSender().getLocalName() + " and it's " + (msg.getPerformative() == ACLMessage.ACCEPT_PROPOSAL ? "ACCEPT_PROPOSAL" : "REFUSE"));
                             if(msg.getPerformative() == ACLMessage.ACCEPT_PROPOSAL)
                             {
                                 try {
@@ -547,6 +556,26 @@ public class Player extends Agent {
                     }
                     case SYNCHRONIZE_GAME_OVER_STEP:
                     {
+                        int[] goal = game.getGoal(id);
+                        if(reachedGoal)
+                            reward += 100;
+                        else
+                            reward -= 10 * (Math.abs(row - goal[0]) + Math.abs(col - goal[1]));
+
+                        reward += 5 * pins.size();
+                        
+                        // Send reward to the game master
+                        ACLMessage msgGM = new ACLMessage(ACLMessage.INFORM);
+                        msgGM.addReceiver(new AID("GameMaster", AID.ISLOCALNAME));
+                        msgGM.setOntology(SYNCHRONIZE_REWARD_ONTOLOGY);
+                        try {
+                            msgGM.setContentObject(reward);
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                        }
+                        send(msgGM);
+
+                        gameOver = true;
                         break;
                     }
                 }
@@ -554,18 +583,6 @@ public class Player extends Agent {
             
             @Override
             public boolean done() {
-                if(gameOver)
-                {
-                    int[] goal = game.getGoal(id);
-                    if(reachedGoal)
-                        reward += 100;
-                    else
-                        reward -= 10 * (Math.abs(row - goal[0]) + Math.abs(col - goal[1]));
-
-                    reward += 5 * pins.size();
-
-                    System.out.println("Player" + (id+1) + " reward: " + reward);
-                }
                 return gameOver;
             }
         });
