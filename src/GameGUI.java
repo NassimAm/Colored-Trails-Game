@@ -6,7 +6,10 @@ public class GameGUI extends JFrame {
     private Game game;
     private float fps = 60.0f;
     private JPanel boardPanel;
-    private ArrayList<GamePosNotification> notifications = new ArrayList<GamePosNotification>();
+    private JPanel pinsPanel;
+    private JPanel[] playersPinsPanels;
+    private ArrayList<GamePosNotification> posNotifications = new ArrayList<GamePosNotification>();
+    private ArrayList<GamePinsNotification> pinsNotifications = new ArrayList<GamePinsNotification>();
 
     public GameGUI(Game game, float fps) {
         this.game = game;
@@ -14,14 +17,20 @@ public class GameGUI extends JFrame {
         setTitle("Colored Trails Game");
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 
-        JPanel mainPanel = new JPanel(new BorderLayout());
+        // Main panel
+        JPanel mainPanel = new JPanel(new GridLayout(1, 2, 5, 0));
         mainPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 
+        // Pins panel
+        this.pinsPanel = new JPanel(new GridLayout(game.getNbPlayers(), 1, 5, 5));
+        this.playersPinsPanels = new JPanel[game.getNbPlayers()];
+        mainPanel.add(pinsPanel);
+
+        // Board panel
         this.boardPanel = new JPanel(new GridLayout(game.getNbRows(), game.getNbColumns(), 5, 5));
         this.boardPanel.setBorder(BorderFactory.createEmptyBorder(0, 0, 5, 0));
         initBoard();
-
-        mainPanel.add(boardPanel, BorderLayout.CENTER);
+        mainPanel.add(boardPanel);
 
         setContentPane(mainPanel);
         pack();
@@ -57,7 +66,11 @@ public class GameGUI extends JFrame {
     }
 
     public void notifyPos(int playerId, int row, int col) {
-        notifications.add(new GamePosNotification(playerId, row, col));
+        posNotifications.add(new GamePosNotification(playerId, row, col));
+    }
+
+    public void notifyPins(int playerId, ArrayList<Integer> pins) {
+        pinsNotifications.add(new GamePinsNotification(playerId, pins));
     }
 
     public void updateBoard() {
@@ -70,11 +83,11 @@ public class GameGUI extends JFrame {
                 // Search in notifications
                 int playerId = -1;
                 int notifId = -1;
-                for(int k = 0; k<notifications.size(); k++)
+                for(int k = 0; k<posNotifications.size(); k++)
                 {
-                    if(i == notifications.get(k).getRow() && j == notifications.get(k).getCol())
+                    if(i == posNotifications.get(k).getRow() && j == posNotifications.get(k).getCol())
                     {
-                        playerId = notifications.get(k).getPlayerId();
+                        playerId = posNotifications.get(k).getPlayerId();
                         notifId = k;
                         break;
                     }
@@ -89,7 +102,7 @@ public class GameGUI extends JFrame {
                     cellPanel.setBorder(BorderFactory.createLineBorder(Color.BLACK, 1)); // Add border around player cells
                     cellPanel.setLayout(new BorderLayout());
                     cellPanel.add(playerLabel, BorderLayout.CENTER);
-                    notifications.remove(notifId);
+                    posNotifications.remove(notifId);
                 }
                 else
                 {
@@ -153,6 +166,57 @@ public class GameGUI extends JFrame {
             default:
                 return Color.GRAY;
         }
+    }
+
+    public void updatePinsPanel() {
+        // Clear pins panel
+        pinsPanel.removeAll();
+
+        for(int i=0; i<pinsNotifications.size(); i++)
+        {
+            int playerId = pinsNotifications.get(i).getPlayerId();
+            ArrayList<Integer> pins = pinsNotifications.get(i).getPins();
+
+            JPanel playerPinsPanel = new JPanel(new GridLayout(2, 1, 0, 0));
+            JLabel pinsLabel = new JLabel("Player" + (playerId + 1) + " Pins");
+            pinsLabel.setHorizontalAlignment(SwingConstants.CENTER);
+            playerPinsPanel.add(pinsLabel, BorderLayout.NORTH);
+
+            JPanel pinsContentPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 5, 5));
+            pinsContentPanel.setBorder(BorderFactory.createEmptyBorder(5, 5, 5, 5));
+
+            // Display pins as colored circles
+            for (int pin : pins) {
+                JPanel pinPanel = new JPanel() {
+                    @Override
+                    protected void paintComponent(Graphics g) {
+                        super.paintComponent(g);
+                        g.setColor(getColorFromIndex(pin));
+                        int diameter = Math.min(getWidth(), getHeight());
+                        g.fillOval((getWidth() - diameter) / 2, (getHeight() - diameter) / 2, diameter, diameter);
+                    }
+                };
+                pinPanel.setPreferredSize(new Dimension(20, 20)); // Adjust pin size as needed
+                pinsContentPanel.add(pinPanel);
+            }
+
+            playerPinsPanel.add(pinsContentPanel, BorderLayout.CENTER);
+
+            // Update the main pins panel
+            playersPinsPanels[playerId] = playerPinsPanel;
+        }
+
+        for(int i=0; i<playersPinsPanels.length; i++)
+        {
+            if(playersPinsPanels[i] != null)
+            {
+                pinsPanel.add(playersPinsPanels[i]);
+            }
+        
+        }
+
+        revalidate();
+        repaint();
     }
 
     public Game getGame() {

@@ -71,7 +71,8 @@ public class Player extends Agent {
                         
                         // Notify the gui with the new player position
                         gui.notifyPos(id, row, col);
-
+                        // Notify the gui with the new player pins
+                        gui.notifyPins(id, pins);
                         // Check if player is on goal
                         if(row == goal[0] && col == goal[1])
                         {

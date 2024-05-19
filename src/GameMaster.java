@@ -104,6 +104,7 @@ public class GameMaster extends Agent {
                         send(msg);
                         // Update the gui
                         gui.updateBoard();
+                        gui.updatePinsPanel();
                         // Reset the number of offers available in the game round
                         gameNbOffers = 0;
 
