@@ -6,6 +6,7 @@ import jade.core.Agent;
 import jade.core.behaviours.Behaviour;
 import jade.lang.acl.ACLMessage;
 import jade.lang.acl.MessageTemplate;
+import jade.lang.acl.UnreadableException;
 
 public class Player extends Agent {
     private int id;
@@ -21,11 +22,15 @@ public class Player extends Agent {
     private ArrayList<PlayerOffer> offers = new ArrayList<PlayerOffer>();
     private int nbOffersSent = 0;
     private int gameNbOffers = 0;
+    private ArrayList<Integer> reputations = new ArrayList<Integer>();
     private int nbRespondersRepliesReceived = 0;
     private boolean gameOver = false;
     private String gameOverDescription = null;
 
     public static final int MAX_ROUNDS_BLOCKED = 3;
+    public static final float HELP_BLOCKED_PROB = 0.6f;
+
+    public static final float MIN_TRUST_PROB = 0.5f;
 
     public static final int CHOOSE_ACTION_STEP = 0;
     public static final int SYNCHRONIZE_CHOOSE_ACTION_STEP = 1;
@@ -44,6 +49,16 @@ public class Player extends Agent {
     public static final String OFFER_PROPOSAL_ONTOLOGY = "Offer Proposal";
     public static final String RESPONDER_OFFER_REPLY_ONTOLOGY = "Responder Offer Reply";
 
+    private double getTrustProbability(int playerId)
+    {
+        double minReputation = Collections.min(reputations);
+        double maxReputation = Collections.max(reputations);
+        if(minReputation != maxReputation)
+            return MIN_TRUST_PROB + (1.0 - MIN_TRUST_PROB) * ((reputations.get(playerId) - minReputation) / (maxReputation - minReputation));
+        else
+            return 1.0;
+    }
+
     @Override
     protected void setup() {
         super.setup();
@@ -56,6 +71,11 @@ public class Player extends Agent {
         this.col = (int) (Math.random() * this.game.getNbColumns());
         for (int i = 0; i < (int) ((this.game.getNbRows() + this.game.getNbColumns()) / 2); i++) {
             this.pins.add((int) (Math.random() * this.game.getNbColors()));
+        }
+
+        for(int i=0; i<this.game.getNbPlayers(); i++)
+        {
+            reputations.add(0);
         }
 
         addBehaviour(new Behaviour() {
@@ -387,15 +407,31 @@ public class Player extends Agent {
                                     ArrayList<Integer> tempPins = new ArrayList<Integer>(pins);
                                     tempPins.add(offers.get(i).getPinOffered());
                                     boolean hasRequestedPin = tempPins.remove((Object)(offers.get(i).getPinRequested()));
-                                    if(offers.get(i).getNbRoundsBlocked() < 2 || hasRequestedPin)
+                                    if(offers.get(i).getNbRoundsBlocked() < MAX_ROUNDS_BLOCKED - 1 || hasRequestedPin)
                                     {
-                                        for(int j=0; j<colors.size(); j++)
+                                        // The player will be blocked in the next round
+                                        if(offers.get(i).getNbRoundsBlocked() == MAX_ROUNDS_BLOCKED - 1)
                                         {
-                                            if(colors.get(j) != -1 && distances.get(j) < minDistance && tempPins.contains(colors.get(j)))
+                                            if(Math.random() < HELP_BLOCKED_PROB)
                                             {
-                                                minDistance = distances.get(j);
                                                 minOfferIndex = i;
                                                 minOfferhasRequestedPin = hasRequestedPin;
+                                                break;
+                                            }
+                                        }
+                                        else // The player doesn't help
+                                        {
+                                            if(Math.random() < getTrustProbability(offers.get(i).getProposerId()))
+                                            {
+                                                for(int j=0; j<colors.size(); j++)
+                                                {
+                                                    if(colors.get(j) != -1 && distances.get(j) < minDistance && tempPins.contains(colors.get(j)))
+                                                    {
+                                                        minDistance = distances.get(j);
+                                                        minOfferIndex = i;
+                                                        minOfferhasRequestedPin = hasRequestedPin;
+                                                    }
+                                                }
                                             }
                                         }
                                     }
@@ -466,6 +502,11 @@ public class Player extends Agent {
                         ACLMessage msg = receive(mt);
                         if(msg != null)
                         {
+                            try {
+                                reputations = (ArrayList<Integer>) msg.getContentObject();
+                            } catch (UnreadableException e) {
+                                e.printStackTrace();
+                            }
                             step = OFFERS_REPLY_STEP;
                         }
                         else

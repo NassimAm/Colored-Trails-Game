@@ -1,3 +1,6 @@
+import java.io.IOException;
+import java.util.ArrayList;
+
 import jade.core.AID;
 import jade.core.Agent;
 import jade.core.behaviours.Behaviour;
@@ -13,6 +16,7 @@ public class GameMaster extends Agent {
     private boolean initGameOver = false;
     private boolean gameOver = false;
     private String gameOverDescription = "";
+    private ArrayList<Integer> reputations = new ArrayList<Integer>();
 
     public static final int WAIT_CHOOSE_ACTION_STEP = 0;
     public static final int SYNCHRONIZE_CHOOSE_ACTION_STEP = 1;
@@ -28,6 +32,11 @@ public class GameMaster extends Agent {
 
         Object[] args = getArguments();
         this.gui = (GameGUI) args[0];
+
+        for(int i=0; i<this.gui.getGame().getNbPlayers(); i++)
+        {
+            reputations.add(0);
+        }
 
         addBehaviour(new Behaviour() {
             @Override
@@ -131,6 +140,8 @@ public class GameMaster extends Agent {
                                 {
                                     System.out.println("- Player" + (offer.getProposerId()+1) + " offers " + offer.getPinOffered() + " in exchange of " + offer.getPinRequested() + " to Player" + (offer.getResponderId()+1));
                                     System.out.println("\tPlayer" + (offer.getProposerId()+1) + " has " + (offer.hasProposerDeceived() ? "deceived" : "not deceived") + " and Player" + (offer.getResponderId()+1) + " has " + (offer.hasResponderDeceived() ? "deceived" : "not deceived"));
+                                    reputations.set(offer.getProposerId(), reputations.get(offer.getProposerId()) + (offer.hasProposerDeceived() ? -1 : 1));
+                                    reputations.set(offer.getResponderId(), reputations.get(offer.getResponderId()) + (offer.hasResponderDeceived() ? -1 : 1));
                                 }
                             } catch (Exception e) {
                                 e.printStackTrace();
@@ -157,6 +168,14 @@ public class GameMaster extends Agent {
                             msg.addReceiver(new AID("Player"+(i+1), AID.ISLOCALNAME));
                         }
                         msg.setOntology(Player.SYNCHRONIZE_RECEIVE_OFFERS_ONTOLOGY);
+
+                        // Send updated reputations to players
+                        try {
+                            msg.setContentObject(reputations);
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                        }
+
                         send(msg);
 
                         stepInRound = WAIT_OFFERS_REPLY_STEP;
@@ -233,6 +252,8 @@ public class GameMaster extends Agent {
                     System.out.println("Game ended in " + round + " rounds");
                     if(!gameOverDescription.isEmpty())
                         System.out.println(gameOverDescription.trim());
+                    System.out.println("Players Reputations:");
+                    System.out.println(reputations);
                 }
                 return gameOver;
             }
