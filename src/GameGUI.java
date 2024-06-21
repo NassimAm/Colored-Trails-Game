@@ -47,9 +47,10 @@ public class GameGUI extends JFrame {
                 Integer goalIndex = getGoalIndex(i, j);
                 if (goalIndex != -1) {
                     JLabel goalLabel = new JLabel("G" + (goalIndex+1));
+                    int color = game.getColor(i, j);
                     goalLabel.setHorizontalAlignment(SwingConstants.CENTER);
-                    goalLabel.setForeground(Color.WHITE);
-                    cellPanel.setBackground(Color.DARK_GRAY); // Set goal cell color
+                    goalLabel.setForeground(Color.BLACK);
+                    cellPanel.setBackground(getColorFromIndex(color)); // Set goal cell color
                     cellPanel.setBorder(BorderFactory.createLineBorder(Color.BLACK, 1)); // Add border around goal cells
                     cellPanel.setLayout(new BorderLayout());
                     cellPanel.add(goalLabel, BorderLayout.CENTER);
@@ -108,10 +109,11 @@ public class GameGUI extends JFrame {
                 {
                     Integer goalIndex = getGoalIndex(i, j);
                     if (goalIndex != -1) {
+                        int color = game.getColor(i, j);
                         JLabel goalLabel = new JLabel("G" + (goalIndex+1));
                         goalLabel.setHorizontalAlignment(SwingConstants.CENTER);
-                        goalLabel.setForeground(Color.WHITE);
-                        cellPanel.setBackground(Color.DARK_GRAY); // Set goal cell color
+                        goalLabel.setForeground(Color.BLACK);
+                        cellPanel.setBackground(getColorFromIndex(color)); // Set goal cell color
                         cellPanel.setBorder(BorderFactory.createLineBorder(Color.BLACK, 1)); // Add border around goal cells
                         cellPanel.setLayout(new BorderLayout());
                         cellPanel.add(goalLabel, BorderLayout.CENTER);
