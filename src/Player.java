@@ -79,6 +79,7 @@ public class Player extends Agent {
         }
 
         addBehaviour(new Behaviour() {
+            @SuppressWarnings("unchecked")
             @Override
             public void action() {
                 switch (step) {
